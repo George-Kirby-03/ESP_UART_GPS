@@ -27,44 +27,35 @@ void app_main() {
     const int uart_buffer_size = 1024; // Buffer size
     QueueHandle_t uart_queue; // UART queue
     ESP_ERROR_CHECK(uart_driver_install(uart_num, uart_buffer_size, 0, 10, &uart_queue, 0)); // Install UART driver
-    uint8_t data[300]; // Buffer for received data
+    uint8_t data[600]; // Buffer for received data
     uart_event_t event;
     while (1) {
         // Wait for a UART event to occur
-        if (xQueueReceive(uart_queue, &event, portMAX_DELAY)) {
+        if (xQueueReceive(uart_queue, &event, 1000 / portTICK_PERIOD_MS)) {
             switch (event.type) {
                 case UART_DATA:
-                   int len = uart_read_bytes(uart_num, data, sizeof(data), 100/ portTICK_PERIOD_MS);
+                   int len = uart_read_bytes(uart_num, data, sizeof(data), 1/ portTICK_PERIOD_MS);
                    if (len > 0) {
                        data[len] = '\0'; // Null-terminate the string
-                       ESP_LOGI("UART", "Received data:\n %s", data); // Log the received data
+                       ESP_LOGI("UART", "Received data (size %d):\n %s", len, data); // Log the received data
+                   }
+                   else if (len == -1) {
+                       ESP_LOGE("UART", "Error reading data");
+                   }
+                   else {
+                       ESP_LOGI("UART", "No data received");
                    }
                     break;
                 case UART_FIFO_OVF:
                     // RX FIFO overflowed — might want to flush or log
                     break;
-                case UART_BUFFER_FULL:
-                    // The software buffer is full
-                    break;
-                case UART_BREAK:
-                    // Break condition received
-                    break;
-                case UART_PARITY_ERR:
-                    // Parity error
-                    break;
-                case UART_FRAME_ERR:
-                    // Frame error
-                    ESP_LOGW("UART", "Frame error detected");
-                    break;
-                case UART_PATTERN_DET:
-                    // Pattern detected
-                    break;       
-                case UART_DATA_BREAK:
-                    // Data break condition
-                    break;      
-                case UART_EVENT_MAX:    
+                default: 
                     break;        
             }
         }
+        else {
+            ESP_LOGI("UART", "No event received");
+        }
+        vTaskDelay(1000 / portTICK_PERIOD_MS); // Delay for 1 second
     }
 }
