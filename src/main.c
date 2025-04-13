@@ -24,20 +24,20 @@ uart_config_t uart_config_gps = {
 void app_main() {
     ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config_gps)); // Install UART driver
     ESP_ERROR_CHECK(uart_set_pin(uart_num, 17, 16, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE)); // Set UART pins
-    const int uart_buffer_size = 1024; // Buffer size
+    const int uart_buffer_size = 600; // Buffer size
     QueueHandle_t uart_queue; // UART queue
     ESP_ERROR_CHECK(uart_driver_install(uart_num, uart_buffer_size, 0, 10, &uart_queue, 0)); // Install UART driver
     uint8_t data[600]; // Buffer for received data
     uart_event_t event;
     while (1) {
         // Wait for a UART event to occur
-        if (xQueueReceive(uart_queue, &event, 1000 / portTICK_PERIOD_MS)) {
+        if (xQueueReceive(uart_queue, &event, 100/portTICK_PERIOD_MS)) {
             switch (event.type) {
                 case UART_DATA:
-                   int len = uart_read_bytes(uart_num, data, sizeof(data), 1/ portTICK_PERIOD_MS);
+                  int len = uart_read_bytes(uart_num, data, sizeof(data), 1000/ portTICK_PERIOD_MS);
                    if (len > 0) {
                        data[len] = '\0'; // Null-terminate the string
-                       ESP_LOGI("UART", "Received data (size %d):\n %s", len, data); // Log the received data
+                       printf("%s", data); // Log the received data
                    }
                    else if (len == -1) {
                        ESP_LOGE("UART", "Error reading data");
@@ -47,15 +47,12 @@ void app_main() {
                    }
                     break;
                 case UART_FIFO_OVF:
-                    // RX FIFO overflowed — might want to flush or log
+                ESP_LOGE("UART", "Error fifo is full!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                     break;
                 default: 
                     break;        
             }
         }
-        else {
-            ESP_LOGI("UART", "No event received");
-        }
-        vTaskDelay(1000 / portTICK_PERIOD_MS); // Delay for 1 second
+
     }
 }
