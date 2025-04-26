@@ -6,7 +6,11 @@
 #include "driver/gpio.h"
 #include "sdkconfig.h"
 #include "esp_log.h"
+#include "esp_task_wdt.h"
 
+void esp_task_wdt_isr_user_handler(void){
+    printf("WDT ISR handler\n");
+}
 
 //UART Configuration structure
 
@@ -35,13 +39,14 @@ void init_uart() {
 static void uart_event_task(void *pvParameters) {
     while (1) {
         // Wait for a UART event to occur
-        int len = uart_read_bytes(uart_num, data, sizeof(data), 10/ portTICK_PERIOD_MS);
+        int len = uart_read_bytes(uart_num, data, sizeof(data), 1/ portTICK_PERIOD_MS);
         if (len > 0) {   
+            
             data[len] = '\0'; // Null-terminate the string
             printf("%s", data); // Log the received data
         }
         else if (len == 0) {
-            ESP_LOGI("UART", "No data received");
+            ESP_LOGW("UART", "No data");
         }
         else if (len < 0) {
             ESP_LOGE("UART", "Error reading data");
@@ -60,7 +65,64 @@ static void uart_event_task(void *pvParameters) {
     }
 }
 
+TaskHandle_t taskAHandle;
+TaskHandle_t taskBHandle;
+// Perform an action every 10 ticks.
+void vTaskFunction( void * pvParameters )
+{
+    TickType_t xLastWakeTime;
+    const TickType_t xFrequency = 10;
+
+    // Initialise the xLastWakeTime variable with the current time.
+    xLastWakeTime = xTaskGetTickCount();
+   // printf("Hello refrefsedfgsegtrsdtgtrdgrtdgthr!\n");
+    for( ;; )
+    {
+        // Wait for the next cycle.
+        vTaskDelayUntil( &xLastWakeTime, xFrequency );
+        printf("Hello World tAK111111111! %lu\n", xLastWakeTime);
+        // Perform action here.
+    }
+}
+
+static void loop1(void *pvParameters) {
+    while(taskBHandle == NULL){
+        printf("Waiting for task B to be created...\n");
+        vTaskDelay(1000 / portTICK_PERIOD_MS); // Delay for 1 second
+    }
+    while(1){
+        printf("Hello World tAK222222222!\n");
+        vTaskDelay(100 / portTICK_PERIOD_MS); // Delay for 1 second
+        vTaskResume(taskBHandle);
+        vTaskSuspend(NULL); // Suspend task A
+    }
+}
+
+static void loop2(void *pvParameters) {
+    while(taskAHandle == NULL){
+        printf("Waiting for task A to be created...\n");
+        vTaskDelay(1000 / portTICK_PERIOD_MS); // Delay for 1 second
+    }
+    // Wait for task A to be created
+    while(1){
+        printf("Hello World tAK2!\n");
+        vTaskDelay(100 / portTICK_PERIOD_MS); 
+        vTaskResume(taskAHandle); // Delay for 1 second
+        vTaskSuspend(NULL); // Suspend task B
+    }
+}
+
+
 void app_main() {
-    init_uart();
-    xTaskCreate(uart_event_task, "uart_event_task", 2048, NULL, configMAX_PRIORITIES - 2, NULL); // Create UART event task
+    // init_uart();
+   //  xTaskCreate(uart_event_task, "uart_event_task", 2048, NULL, configMAX_PRIORITIES - 2, NULL); // Create UART event task
+    xTaskCreatePinnedToCore(vTaskFunction, "loop", 2048, NULL, configMAX_PRIORITIES - 2, NULL, 0); // Create loop task
+  
+   xTaskCreatePinnedToCore(loop1, "loop1", 2048, NULL, configMAX_PRIORITIES - 3, &taskAHandle, 0); // Create loop task 
+  
+   xTaskCreatePinnedToCore(loop2, "loop2", 2048, NULL, configMAX_PRIORITIES - 3, &taskBHandle, 0); // Create loop task
+   // esp_task_wdt_isr_user_handler();
+    // esp_task_wdt_init(10, true); // Initialize WDT with a timeout of 10 seconds
+    // esp_task_wdt_add(NULL); // Add the current task to WDT
+    // esp_task_wdt_delete(NULL); // Delete the current task from WDT
 }
